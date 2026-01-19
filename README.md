@@ -1,4 +1,4 @@
-# QuickAI - Full Stack AI Tools Platform
+# QuickAI - Full Stack AI Tools Platform..
 
 A comprehensive full-stack web application that provides various AI-powered tools including content generation, image processing, and more.
 
