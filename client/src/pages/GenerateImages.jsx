@@ -3,6 +3,7 @@ import React, { useState } from 'react'
 import axios from 'axios'
 import { useAuth } from '@clerk/clerk-react';
 import toast from 'react-hot-toast';
+import OptimizePromptButton from '../components/ai/OptimizePromptButton';
 
 axios.defaults.baseURL = import.meta.env.VITE_BASE_URL;
 
@@ -49,6 +50,12 @@ const GenerateImages = () => {
           <p className='mt-6 text-sm font-medium'>Describe Your Image</p>
 
           <textarea onChange={(e)=>setInput(e.target.value)} value={input} rows={4} className='w-full p-2 px-3 mt-2 outline-none text-sm rounded-md border border-gray-300' placeholder='Describe what you want to see in the image..' required/>
+
+          <OptimizePromptButton 
+            prompt={input} 
+            onOptimized={(optimized) => setInput(optimized)}
+            disabled={loading}
+          />
 
           <p className='mt-4 text-sm font-medium'>Style</p>
 

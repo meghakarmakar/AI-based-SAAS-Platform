@@ -5,6 +5,7 @@ import axios from "axios";
 import { v2 as cloudinary } from "cloudinary";
 import fs from 'fs'
 import pdf from 'pdf-parse/lib/pdf-parse.js'
+import { optimizePrompt as optimizePromptService } from '../services/ai/promptOptimizerService.js';
 
 const AI = new OpenAI({
     apiKey: process.env.GEMINI_API_KEY,
@@ -286,3 +287,71 @@ export const resumeReview = async (req, res)=>{
         res.json({success: false, message: error.message})
     }
 }
+
+/**
+ * Optimize Prompt Controller
+ * 
+ * Handles prompt optimization requests using Gemini API.
+ * Validates input and returns enhanced prompt text.
+ * 
+ * @route POST /api/ai/optimize-prompt
+ * @access Private (requires authentication)
+ */
+export const optimizePromptController = async (req, res) => {
+    try {
+        // 1. Extract prompt from request body
+        const { prompt } = req.body;
+
+        // 2. Validate prompt presence
+        if (!prompt) {
+            return res.status(400).json({ 
+                success: false, 
+                message: "Prompt is required" 
+            });
+        }
+
+        // 3. Call optimization service
+        const optimizedPrompt = await optimizePromptService(prompt);
+
+        // 4. Return success response
+        res.status(200).json({ 
+            success: true, 
+            optimizedPrompt 
+        });
+
+    } catch (error) {
+        console.error('[OptimizePrompt] Error:', error.message);
+        
+        // Handle rate limiting errors
+        if (error.status === 429 || error.message.includes('429')) {
+            return res.status(429).json({
+                success: false, 
+                message: "Too many requests. Please wait a moment and try again."
+            });
+        }
+        
+        // Handle quota exceeded errors
+        if (error.message.includes('quota') || error.message.includes('RESOURCE_EXHAUSTED')) {
+            return res.status(429).json({
+                success: false, 
+                message: "API quota exceeded. Please try again later."
+            });
+        }
+
+        // Handle validation errors (400)
+        if (error.message.includes('too short') || 
+            error.message.includes('exceeds') || 
+            error.message.includes('must be a string')) {
+            return res.status(400).json({
+                success: false,
+                message: error.message
+            });
+        }
+        
+        // Generic server error (500)
+        res.status(500).json({
+            success: false, 
+            message: error.message || "Failed to optimize prompt"
+        });
+    }
+};
