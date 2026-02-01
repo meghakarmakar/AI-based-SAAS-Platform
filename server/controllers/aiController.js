@@ -60,7 +60,7 @@ export const generateArticle = async (req, res)=>{
         if (error.status === 429 || error.message.includes('429')) {
             return res.json({
                 success: false, 
-                message: "API rate limit exceeded. Please wait a moment and try again."
+                message: "API rate limit exceeded. Please wait a moment and try again.."
             })
         }
         
