@@ -17,7 +17,7 @@ const AI = new OpenAI({
 const OPTIMIZATION_CONFIG = {
     MODEL: 'gemini-3-flash-preview',
     TEMPERATURE: 0.5,
-    MAX_TOKENS: 200,
+    MAX_TOKENS: 1000,  // High limit to ensure complete output without truncation
     MIN_PROMPT_LENGTH: 10,
     MAX_PROMPT_LENGTH: 2000,
 };
@@ -48,7 +48,7 @@ export const optimizePrompt = async (rawPrompt) => {
     }
 
     // 4. Construct optimization instruction
-    const systemPrompt = "Rewrite and improve the following user prompt to be clearer, more descriptive, and more effective for AI generation. Preserve intent. Return ONLY the improved prompt.";
+    const systemPrompt = "Rewrite and improve the following user prompt to be clearer, more descriptive, and more effective for AI generation. Keep the output concise and well-structured. Ensure your response is a COMPLETE sentence or paragraph with proper punctuation. Preserve the original intent. Return ONLY the improved prompt, nothing else.";
     const userMessage = trimmedPrompt;
 
     try {
@@ -65,11 +65,21 @@ export const optimizePrompt = async (rawPrompt) => {
 
         // 6. Extract optimized content
         const optimizedPrompt = response.choices[0].message.content.trim();
+        const finishReason = response.choices[0].finish_reason;
 
         // 7. Remove any surrounding quotes if Gemini added them
         const cleanedPrompt = optimizedPrompt.replace(/^["']|["']$/g, '');
 
-        // 8. Validate response is reasonable
+        // 8. Check if response was complete (not truncated)
+        const endsWithPunctuation = /[.!?]$/.test(cleanedPrompt);
+        
+        if (finishReason === 'length' || !endsWithPunctuation) {
+            // Output was truncated - return original prompt to avoid incomplete sentences
+            console.warn('[PromptOptimizer] Response incomplete or truncated - returning original prompt');
+            throw new Error('Unable to optimize - prompt may be too complex. Try a shorter prompt.');
+        }
+
+        // 9. Validate response is reasonable
         if (!cleanedPrompt || cleanedPrompt.length < trimmedPrompt.length / 2) {
             throw new Error('Optimization produced invalid result');
         }
