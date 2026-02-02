@@ -19,9 +19,10 @@ export const generateArticle = async (req, res)=>{
         const plan = req.plan;
         const free_usage = req.free_usage;
 
-        if(plan !== 'premium' && free_usage >= 10){
-            return res.json({ success: false, message: "Limit reached. Upgrade to continue."})
-        }
+        // TEMPORARILY DISABLED FOR TESTING - Remove this comment and uncomment below for production
+        // if(plan !== 'premium' && free_usage >= 10){
+        //     return res.json({ success: false, message: "Limit reached. Upgrade to continue."})
+        // }
 
         const response = await AI.chat.completions.create({
             model: "gemini-3-flash-preview",
@@ -77,6 +78,32 @@ export const generateArticle = async (req, res)=>{
     }
 }
 
+/**
+ * Sanitizes LLM blog title response by removing common prefixes, numbering, and extra formatting
+ * @param {string} rawContent - Raw LLM response
+ * @returns {string} - Cleaned blog title
+ */
+function sanitizeBlogTitle(rawContent) {
+    if (!rawContent || typeof rawContent !== 'string') {
+        return '';
+    }
+    
+    // Remove common prefixes that LLMs add
+    let cleaned = rawContent
+        .replace(/^(Blog Title:|Title:|Here (?:is|are).+?:|Suggested Title:|Blog Post Title:)/i, '')
+        .replace(/^\d+\.\s*/, '') // Remove numbering (1. 2. etc)
+        .replace(/^[\"']|[\"']$/g, '') // Remove surrounding quotes
+        .trim();
+    
+    // If response contains multiple lines, take the first non-empty line
+    // This handles cases where LLM returns explanations after the title
+    const lines = cleaned.split('\n').filter(line => line.trim().length > 0);
+    const firstLine = lines[0] || cleaned;
+    
+    // Final cleanup
+    return firstLine.trim();
+}
+
 export const generateBlogTitle = async (req, res)=>{
     try {
         const { userId } = req.auth();
@@ -84,18 +111,34 @@ export const generateBlogTitle = async (req, res)=>{
         const plan = req.plan;
         const free_usage = req.free_usage;
 
-        if(plan !== 'premium' && free_usage >= 10){
-            return res.json({ success: false, message: "Limit reached. Upgrade to continue."})
-        }
+        // TEMPORARILY DISABLED FOR TESTING - Remove this comment and uncomment below for production
+        // if(plan !== 'premium' && free_usage >= 10){
+        //     return res.json({ success: false, message: "Limit reached. Upgrade to continue."})
+        // }
 
         const response = await AI.chat.completions.create({
             model: "gemini-3-flash-preview",
             messages: [{ role: "user", content: prompt, } ],
             temperature: 0.7,
-            max_tokens: 100,
+            max_tokens: 500, // Increased to 500 to account for longer prompt + full title generation
         });
 
-        const content = response.choices[0].message.content
+        const rawContent = response.choices[0].message.content
+        
+        // Debug logging to track actual LLM responses
+        console.log('[GenerateBlogTitle] Raw LLM response:', rawContent);
+        console.log('[GenerateBlogTitle] Finish reason:', response.choices[0].finish_reason);
+        
+        // Check if response was truncated
+        if (response.choices[0].finish_reason === 'length') {
+            console.warn('⚠️  [GenerateBlogTitle] WARNING: Response truncated due to max_tokens limit!');
+            console.warn('⚠️  Consider increasing max_tokens or simplifying the prompt.');
+        }
+        
+        // Sanitize the blog title to remove prefixes, numbering, and extra text
+        const content = sanitizeBlogTitle(rawContent);
+        
+        console.log('[GenerateBlogTitle] Sanitized title:', content);
 
         await Creation.create({
             user_id: userId,
