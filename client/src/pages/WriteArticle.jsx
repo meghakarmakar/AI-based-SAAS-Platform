@@ -1,5 +1,5 @@
 import { Edit, Sparkles } from 'lucide-react'
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import axios from 'axios'
 import { useAuth } from '@clerk/clerk-react';
 import toast from 'react-hot-toast';
@@ -20,8 +20,17 @@ const WriteArticle = () => {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [content, setContent] = useState('')
+  const textareaRef = useRef(null)
 
   const {getToken} = useAuth()
+
+  // Auto-resize textarea based on content
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto'
+      textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px'
+    }
+  }, [input])
 
   const onSubmitHandler = async (e)=>{
     e.preventDefault();
@@ -54,7 +63,15 @@ const WriteArticle = () => {
           </div>
           <p className='mt-6 text-sm font-medium'>Article Topic</p>
 
-          <input onChange={(e)=>setInput(e.target.value)} value={input} type="text" className='w-full p-2 px-3 mt-2 outline-none text-sm rounded-md border border-gray-300' placeholder='The future of artificial intelligence is...' required/>
+          <textarea 
+            ref={textareaRef}
+            onChange={(e)=>setInput(e.target.value)} 
+            value={input} 
+            rows={1}
+            className='w-full p-2 px-3 mt-2 outline-none text-sm rounded-md border border-gray-300 resize-none overflow-hidden' 
+            placeholder='The future of artificial intelligence is...' 
+            required
+          />
 
           <OptimizePromptButton 
             prompt={input} 
@@ -80,22 +97,22 @@ const WriteArticle = () => {
           </button>
       </form>
       {/* Right col */}
-      <div className='w-full max-w-lg p-4 bg-white rounded-lg flex flex-col border border-gray-200 min-h-96 max-h-[600px]'>
+      <div className='w-full max-w-lg bg-white rounded-lg flex flex-col border border-gray-200 min-h-96 max-h-[calc(100vh-120px)]'>
 
-            <div className='flex items-center gap-3'>
+            <div className='flex items-center gap-3 p-4 border-b border-gray-100'>
               <Edit className='w-5 h-5 text-[#4A7AFF]' />
               <h1 className='text-xl font-semibold'>Generated article</h1>
             </div>
 
             {!content ? (
-              <div className='flex-1 flex justify-center items-center'>
+              <div className='flex-1 flex justify-center items-center p-4'>
               <div className='text-sm flex flex-col items-center gap-5 text-gray-400'>
                 <Edit className='w-9 h-9' />
-                <p>Enter a topic and click “Generate article ” to get started</p>
+                <p>Enter a topic and click "Generate article " to get started</p>
               </div>
             </div>
             ) : (
-              <div className='mt-3 h-full overflow-y-scroll text-sm text-slate-600'>
+              <div className='flex-1 min-h-0 overflow-y-auto p-4 text-sm text-slate-600'>
                 <div className='reset-tw'>
                   <Markdown>{content}</Markdown>
                 </div>

@@ -1,5 +1,5 @@
 import { Image, Sparkles } from 'lucide-react'
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import axios from 'axios'
 import { useAuth } from '@clerk/clerk-react';
 import toast from 'react-hot-toast';
@@ -16,8 +16,17 @@ const GenerateImages = () => {
       const [publish, setPublish] = useState(false)
       const [loading, setLoading] = useState(false)
       const [content, setContent] = useState('')
+      const textareaRef = useRef(null)
 
       const {getToken} = useAuth()
+
+      // Auto-resize textarea based on content
+      useEffect(() => {
+        if (textareaRef.current) {
+          textareaRef.current.style.height = 'auto'
+          textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px'
+        }
+      }, [input])
     
       const onSubmitHandler = async (e)=>{
         e.preventDefault();
@@ -49,7 +58,15 @@ const GenerateImages = () => {
           </div>
           <p className='mt-6 text-sm font-medium'>Describe Your Image</p>
 
-          <textarea onChange={(e)=>setInput(e.target.value)} value={input} rows={4} className='w-full p-2 px-3 mt-2 outline-none text-sm rounded-md border border-gray-300' placeholder='Describe what you want to see in the image..' required/>
+          <textarea 
+            ref={textareaRef}
+            onChange={(e)=>setInput(e.target.value)} 
+            value={input} 
+            rows={3}
+            className='w-full p-2 px-3 mt-2 outline-none text-sm rounded-md border border-gray-300 resize-none overflow-hidden' 
+            placeholder='Describe what you want to see in the image..' 
+            required
+          />
 
           <OptimizePromptButton 
             prompt={input} 

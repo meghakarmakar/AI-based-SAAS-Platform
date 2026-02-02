@@ -21,8 +21,33 @@ export const auth = async (req, res, next)=>{
         }
 
         req.plan = hasPremiumPlan ? 'premium' : 'free';
+        
+        // Extract role from publicMetadata (defaults to 'user' if not set)
+        req.user = {
+            id: userId,
+            email: user.emailAddresses[0]?.emailAddress,
+            role: user.publicMetadata?.role || 'user'
+        };
+        
         next()
     } catch (error) {
         res.json({ success: false, message: error.message })
+    }
+}
+
+// Middleware to require admin role
+export const requireAdmin = (req, res, next) => {
+    try {
+        if (!req.user) {
+            return res.status(401).json({ success: false, message: 'Authentication required' });
+        }
+        
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ success: false, message: 'Admin access required' });
+        }
+        
+        next();
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
     }
 }
