@@ -1,7 +1,10 @@
-import { Protect, useClerk, useUser } from '@clerk/clerk-react'
-import { Eraser, FileText, Hash, House, Image, LogOut, Scissors, SquarePen, Users, ShoppingBag, Package, Shield, Store } from 'lucide-react';
-import React from 'react'
+import { useAuth, useClerk, useUser } from '@clerk/clerk-react'
+import { Eraser, FileText, Hash, House, Image, LogOut, Scissors, SquarePen, Users, ShoppingBag, Package, Shield, Store, UserRound } from 'lucide-react';
+import React, { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom';
+import axios from 'axios';
+
+axios.defaults.baseURL = import.meta.env.VITE_BASE_URL
 
 const navItems = [
     {to: '/ai', label: 'Dashboard', Icon: House},
@@ -11,16 +14,40 @@ const navItems = [
     {to: '/ai/remove-background', label: 'Remove Background', Icon: Eraser},
     {to: '/ai/remove-object', label: 'Remove Object', Icon: Scissors},
     {to: '/ai/review-resume', label: 'Review Resume', Icon: FileText},
-    {to: '/ai/marketplace', label: 'Browse Prompts', Icon: Store},
+    {to: '/ai/marketplace', label: 'Prompt Library', Icon: Store},
     {to: '/ai/my-prompts', label: 'My Prompts', Icon: Package},
     {to: '/ai/community', label: 'Community', Icon: Users},
+    {to: '/ai/profile', label: 'My Profile', Icon: UserRound},
 ]
 
 const Sidebar = ({ sidebar, setSidebar }) => {
 
     const {user} = useUser();
+    const { getToken } = useAuth();
     const {signOut, openUserProfile} = useClerk()
     const isAdmin = user?.publicMetadata?.role === 'admin';
+    const [billing, setBilling] = useState(null)
+
+    useEffect(()=>{
+        const getBillingSnapshot = async ()=>{
+            try {
+                const token = await getToken()
+                const { data } = await axios.get('/api/billing/subscription', {
+                    headers : {Authorization: `Bearer ${token}`}
+                })
+
+                if (data.success) {
+                    setBilling(data.billing)
+                }
+            } catch (error) {
+                console.error(error.message)
+            }
+        }
+
+        if (user) {
+            getBillingSnapshot()
+        }
+    }, [user, getToken])
 
   return (
     <div className={`w-60 bg-white border-r border-gray-200 flex flex-col justify-between items-center max-sm:absolute top-14 bottom-0 ${sidebar ? 'translate-x-0' : 'max-sm:-translate-x-full'} transition-all duration-300 ease-in-out`}>
@@ -28,12 +55,12 @@ const Sidebar = ({ sidebar, setSidebar }) => {
         <img src={user.imageUrl} alt="User avatar" className='w-13 rounded-full mx-auto'/>
         <h1 className='mt-1 text-center'>{user.fullName}</h1>
         <div className='px-6 mt-5 text-sm text-gray-600 font-medium'>
-            {navItems.map(({to, label, Icon})=>(
-                <NavLink key={to} to={to} end={to === '/ai'} onClick={()=> setSidebar(false)} className={({isActive})=> `px-3.5 py-2.5 flex items-center gap-3 rounded ${isActive ? 'bg-gradient-to-r from-[#3C81F6] to-[#9234EA] text-white' : ''}`}>
+            {navItems.map((item)=>(
+                <NavLink key={item.to} to={item.to} end={item.to === '/ai'} onClick={()=> setSidebar(false)} className={({isActive})=> `px-3.5 py-2.5 flex items-center gap-3 rounded ${isActive ? 'bg-gradient-to-r from-[#3C81F6] to-[#9234EA] text-white' : ''}`}>
                     {({ isActive })=>(
                         <>
-                        <Icon className={`w-4 h-4 ${isActive ? 'text-white' : ''}` } />
-                        {label}
+                        <item.Icon className={`w-4 h-4 ${isActive ? 'text-white' : ''}` } />
+                        {item.label}
                         </>
                     )}
                 </NavLink>
@@ -67,7 +94,7 @@ const Sidebar = ({ sidebar, setSidebar }) => {
                 <div>
                     <h1 className='text-sm font-medium'>{user.fullName}</h1>
                     <p className='text-xs text-gray-500'>
-                        <Protect plan='premium' fallback="Free">Premium</Protect> Plan
+                        {billing?.plan === 'premium' ? 'Premium' : 'Free'} Plan
                     </p>
                 </div>
             </div>

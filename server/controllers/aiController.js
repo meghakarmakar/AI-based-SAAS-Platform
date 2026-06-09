@@ -1,11 +1,11 @@
 import OpenAI from "openai";
 import Creation from "../models/Creation.js";
-import { clerkClient } from "@clerk/express";
 import axios from "axios";
 import { v2 as cloudinary } from "cloudinary";
 import fs from 'fs'
 import pdf from 'pdf-parse/lib/pdf-parse.js'
 import { optimizePrompt as optimizePromptService } from '../services/ai/promptOptimizerService.js';
+import User from "../models/User.js";
 
 const AI = new OpenAI({
     apiKey: process.env.GEMINI_API_KEY,
@@ -17,12 +17,11 @@ export const generateArticle = async (req, res)=>{
         const { userId } = req.auth();
         const { prompt, length } = req.body;
         const plan = req.plan;
-        const free_usage = req.free_usage;
+        const freeUsage = Number(req.free_usage ?? 0);
 
-        // TEMPORARILY DISABLED FOR TESTING - Remove this comment and uncomment below for production
-        // if(plan !== 'premium' && free_usage >= 10){
-        //     return res.json({ success: false, message: "Limit reached. Upgrade to continue."})
-        // }
+        if(plan !== 'premium' && freeUsage >= 10){
+            return res.json({ success: false, message: "Limit reached. Upgrade to continue."})
+        }
 
         const response = await AI.chat.completions.create({
             model: "gemini-3-flash-preview",
@@ -45,11 +44,13 @@ export const generateArticle = async (req, res)=>{
         });
 
         if(plan !== 'premium'){
-            await clerkClient.users.updateUserMetadata(userId, {
-                privateMetadata:{
-                    free_usage: free_usage + 1
+            await User.updateOne(
+                { _id: userId },
+                {
+                    $inc: { 'usage.freeUsage': 1 },
+                    $set: { 'billing.lastSyncedAt': new Date() }
                 }
-            })
+            )
         }
 
         res.json({ success: true, content})
@@ -109,12 +110,11 @@ export const generateBlogTitle = async (req, res)=>{
         const { userId } = req.auth();
         const { prompt } = req.body;
         const plan = req.plan;
-        const free_usage = req.free_usage;
+        const freeUsage = Number(req.free_usage ?? 0);
 
-        // TEMPORARILY DISABLED FOR TESTING - Remove this comment and uncomment below for production
-        // if(plan !== 'premium' && free_usage >= 10){
-        //     return res.json({ success: false, message: "Limit reached. Upgrade to continue."})
-        // }
+        if(plan !== 'premium' && freeUsage >= 10){
+            return res.json({ success: false, message: "Limit reached. Upgrade to continue."})
+        }
 
         const response = await AI.chat.completions.create({
             model: "gemini-3-flash-preview",
@@ -148,11 +148,13 @@ export const generateBlogTitle = async (req, res)=>{
         });
 
         if(plan !== 'premium'){
-            await clerkClient.users.updateUserMetadata(userId, {
-                privateMetadata:{
-                    free_usage: free_usage + 1
+            await User.updateOne(
+                { _id: userId },
+                {
+                    $inc: { 'usage.freeUsage': 1 },
+                    $set: { 'billing.lastSyncedAt': new Date() }
                 }
-            })
+            )
         }
 
         res.json({ success: true, content})
