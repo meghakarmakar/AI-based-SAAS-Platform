@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react'
-import { dummyCreationData } from '../assets/assets'
 import { Gem, Sparkles } from 'lucide-react'
-import { Protect, useAuth } from '@clerk/clerk-react'
+import { useAuth } from '@clerk/clerk-react'
 import CreationItem from '../components/CreationItem'
 import axios from 'axios'
 import toast from 'react-hot-toast'
@@ -11,29 +10,41 @@ axios.defaults.baseURL = import.meta.env.VITE_BASE_URL
 const Dashboard = () => {
  
   const [creations, setCreations] = useState([])
+  const [billing, setBilling] = useState(null)
   const [loading, setLoading] = useState(true)
   const { getToken } = useAuth()
 
-  const getDashboardData = async ()=>{
-    try {
-      const { data } = await axios.get('/api/user/get-user-creations', {
-        headers : {Authorization: `Bearer ${await getToken()}`}
-      })
-
-      if (data.success) {
-        setCreations(data.creations)
-      }else{
-        toast.error(data.message)
-      }
-    } catch (error) {
-      toast.error(error.message)
-    }
-    setLoading(false)
-  }
-
   useEffect(()=>{
+    const getDashboardData = async ()=>{
+      try {
+        const token = await getToken()
+        const [creationsResponse, billingResponse] = await Promise.all([
+          axios.get('/api/user/get-user-creations', {
+            headers : {Authorization: `Bearer ${token}`}
+          }),
+          axios.get('/api/billing/subscription', {
+            headers : {Authorization: `Bearer ${token}`}
+          })
+        ])
+
+        const { data } = creationsResponse
+        if (data.success) {
+          setCreations(data.creations)
+        }else{
+          toast.error(data.message)
+        }
+
+        if (billingResponse.data.success) {
+          setBilling(billingResponse.data.billing)
+        }
+      } catch (error) {
+        toast.error(error.message)
+      }
+      setLoading(false)
+    }
+
     getDashboardData()
-  }, [])
+  }, [getToken])
 
   return (
     <div className='h-full overflow-y-scroll p-6'>
@@ -54,8 +65,9 @@ const Dashboard = () => {
             <div className='text-slate-600'>
               <p className='text-sm'>Active Plan</p>
               <h2 className='text-xl font-semibold'>
-                <Protect plan='premium' fallback="Free">Premium</Protect>
+                {billing?.plan === 'premium' ? 'Premium' : 'Free'}
               </h2>
+              <p className='text-xs text-gray-500 capitalize'>{billing?.status || 'syncing'}</p>
             </div>
             <div className='w-10 h-10 rounded-lg bg-gradient-to-br from-[#FF61C5] to-[#9E53EE] text-white flex justify-center items-center'>
               <Gem className='w-5 text-white' />

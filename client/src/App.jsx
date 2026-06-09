@@ -14,9 +14,8 @@ import MyPrompts from './pages/MyPrompts'
 import BrowsePrompts from './pages/BrowsePrompts'
 import PromptMarketplace from './pages/PromptMarketplace'
 import UserManagement from './pages/UserManagement'
+import Profile from './pages/Profile'
 import AdminRoute from './components/AdminRoute'
-import { useAuth } from '@clerk/clerk-react'
-import { useEffect } from 'react'
 import {Toaster} from 'react-hot-toast'
 
 const App = () => {
@@ -37,6 +36,8 @@ const App = () => {
           <Route path='marketplace' element={<BrowsePrompts/>} />
           <Route path='my-prompts' element={<MyPrompts/>} />
           <Route path='community' element={<Community/>} />
+          <Route path='profile' element={<Profile/>} />
+          <Route path='profile/:section' element={<Profile/>} />
           <Route 
             path='admin/prompt-marketplace' 
             element={
