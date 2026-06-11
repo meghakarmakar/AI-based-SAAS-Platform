@@ -309,12 +309,35 @@ export const resumeReview = async (req, res)=>{
 
         const prompt = `Review the following resume and provide constructive feedback on its strengths, weaknesses, and areas for improvement. Resume Content:\n\n${pdfData.text}`
 
-       const response = await AI.chat.completions.create({
-            model: "gemini-2.0-flash",
-            messages: [{ role: "user", content: prompt, } ],
-            temperature: 0.7,
-            max_tokens: 1000,
-        });
+        // Retry with exponential backoff on 429 rate-limit responses
+        let response;
+        const maxAttempts = 3;
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                response = await AI.chat.completions.create({
+                    model: "gemini-3-flash-preview",
+                    messages: [{ role: "user", content: prompt, } ],
+                    temperature: 0.7,
+                    max_tokens: 1000,
+                });
+                break; // success
+            } catch (err) {
+                console.log(`[ResumeReview] Attempt ${attempt} failed:`, err.message || err);
+                const isRateLimit = err.status === 429 || (err.response && err.response.status === 429) || (err.message && err.message.includes('429'));
+                if (isRateLimit && attempt < maxAttempts) {
+                    // exponential backoff: 1s, 2s, 4s
+                    const delay = 1000 * Math.pow(2, attempt - 1);
+                    await new Promise(r => setTimeout(r, delay));
+                    continue;
+                }
+                // rethrow to be handled by outer catch
+                throw err;
+            }
+        }
+
+        if (!response) {
+            throw new Error('No response from AI service');
+        }
 
         const content = response.choices[0].message.content
 
@@ -328,8 +351,26 @@ export const resumeReview = async (req, res)=>{
         res.json({ success: true, content})
 
     } catch (error) {
-        console.log(error.message)
-        res.json({success: false, message: error.message})
+        console.log('[ResumeReview] Error:', error.message || error);
+
+        // Handle rate limiting explicitly with proper status code and message
+        if (error.status === 429 || (error.response && error.response.status === 429) || (error.message && error.message.includes('429'))) {
+            return res.status(429).json({
+                success: false,
+                message: 'API rate limit exceeded. Please wait a moment and try again.'
+            });
+        }
+
+        // Handle quota exceeded
+        if (error.message && (error.message.includes('quota') || error.message.includes('RESOURCE_EXHAUSTED'))) {
+            return res.status(429).json({
+                success: false,
+                message: 'API quota exceeded. Please try again later.'
+            });
+        }
+
+        // Generic server error
+        return res.status(500).json({success: false, message: error.message || 'Failed to review resume'});
     }
 }
 
