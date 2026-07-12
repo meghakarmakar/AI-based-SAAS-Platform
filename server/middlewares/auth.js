@@ -8,6 +8,8 @@ export const auth = async (req, res, next) => {
         const { userId, has } = await req.auth();
         const hasPremiumPlan = await has({ plan: 'premium' });
         const user = await clerkClient.users.getUser(userId);
+        const existingUser = await User.findById(userId).lean();
+        const resolvedRole = user.publicMetadata?.role || existingUser?.role || 'user';
 
         const [subscription, defaultPaymentMethod] = await Promise.all([
             Subscription.findOne({ userId }).lean(),
@@ -28,7 +30,7 @@ export const auth = async (req, res, next) => {
                     email: user.emailAddresses[0]?.emailAddress,
                     name: user.fullName,
                     imageUrl: user.imageUrl,
-                    role: user.publicMetadata?.role || 'user',
+                    role: resolvedRole,
                     'billing.plan': resolvedPlan,
                     'billing.status': resolvedStatus,
                     'billing.provider': subscription?.provider || 'clerk',
@@ -71,7 +73,7 @@ export const auth = async (req, res, next) => {
         req.user = {
             id: userId,
             email: user.emailAddresses[0]?.emailAddress,
-            role: user.publicMetadata?.role || 'user'
+            role: resolvedRole
         };
 
         next();

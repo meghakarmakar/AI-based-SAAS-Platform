@@ -24,9 +24,11 @@ export const getAllUsers = async (req, res) => {
 export const promoteToAdmin = async (req, res) => {
     try {
         const { userId } = req.params;
+        const user = await clerkClient.users.getUser(userId);
 
         await clerkClient.users.updateUserMetadata(userId, {
             publicMetadata: {
+                ...user.publicMetadata,
                 role: 'admin'
             }
         });
@@ -40,9 +42,11 @@ export const promoteToAdmin = async (req, res) => {
 export const demoteToUser = async (req, res) => {
     try {
         const { userId } = req.params;
+        const user = await clerkClient.users.getUser(userId);
 
         await clerkClient.users.updateUserMetadata(userId, {
             publicMetadata: {
+                ...user.publicMetadata,
                 role: 'user'
             }
         });
