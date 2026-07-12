@@ -17,15 +17,26 @@ import promptMarketplaceRouter from './routes/promptMarketplaceRoutes.js';
 
 const app = express();
 
-await connectCloudinary();
-await connectDB();
+connectCloudinary();
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 app.use(clerkMiddleware());
 
 app.get('/', (req, res) => {
     res.send('Server is Live!');
+});
+
+app.use('/api', async (req, res, next) => {
+    try {
+        await connectDB();
+        next();
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Database connection failed',
+        });
+    }
 });
 
 app.use('/api/webhooks', webhookRouter);

@@ -2,7 +2,6 @@ import OpenAI from "openai";
 import Creation from "../models/Creation.js";
 import axios from "axios";
 import { v2 as cloudinary } from "cloudinary";
-import fs from 'fs'
 import pdf from 'pdf-parse/lib/pdf-parse.js'
 import { optimizePrompt as optimizePromptService } from '../services/ai/promptOptimizerService.js';
 import User from "../models/User.js";
@@ -11,6 +10,21 @@ const AI = new OpenAI({
     apiKey: process.env.GEMINI_API_KEY,
     baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/"
 });
+
+const uploadBufferToCloudinary = (file, options = {}) => {
+    return new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(options, (error, result) => {
+            if (error) {
+                reject(error);
+                return;
+            }
+
+            resolve(result);
+        });
+
+        stream.end(file.buffer);
+    });
+};
 
 export const generateArticle = async (req, res)=>{
     try {
@@ -229,11 +243,15 @@ export const removeImageBackground = async (req, res)=>{
         const image = req.file;
         const plan = req.plan;
 
+        if (!image) {
+            return res.status(400).json({ success: false, message: "Image file is required" })
+        }
+
         if(plan !== 'premium'){
             return res.json({ success: false, message: "This feature is only available for premium subscriptions"})
         }
 
-        const {secure_url} = await cloudinary.uploader.upload(image.path, {
+        const {secure_url} = await uploadBufferToCloudinary(image, {
             transformation: [
                 {
                     effect: 'background_removal',
@@ -264,11 +282,15 @@ export const removeImageObject = async (req, res)=>{
         const image = req.file;
         const plan = req.plan;
 
+        if (!image) {
+            return res.status(400).json({ success: false, message: "Image file is required" })
+        }
+
         if(plan !== 'premium'){
             return res.json({ success: false, message: "This feature is only available for premium subscriptions"})
         }
 
-        const {public_id} = await cloudinary.uploader.upload(image.path)
+        const {public_id} = await uploadBufferToCloudinary(image)
 
         const imageUrl = cloudinary.url(public_id, {
             transformation: [{effect: `gen_remove:${object}`}],
@@ -296,6 +318,10 @@ export const resumeReview = async (req, res)=>{
         const resume = req.file;
         const plan = req.plan;
 
+        if (!resume) {
+            return res.status(400).json({ success: false, message: "Resume file is required" })
+        }
+
         if(plan !== 'premium'){
             return res.json({ success: false, message: "This feature is only available for premium subscriptions"})
         }
@@ -304,8 +330,7 @@ export const resumeReview = async (req, res)=>{
             return res.json({success: false, message: "Resume file size exceeds allowed size (5MB)."})
         }
 
-        const dataBuffer = fs.readFileSync(resume.path)
-        const pdfData = await pdf(dataBuffer)
+        const pdfData = await pdf(resume.buffer)
 
         const prompt = `Review the following resume and provide constructive feedback on its strengths, weaknesses, and areas for improvement. Resume Content:\n\n${pdfData.text}`
 

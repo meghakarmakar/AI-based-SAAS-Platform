@@ -4,7 +4,21 @@ import PromptFile from '../models/PromptFile.js';
 import Review from '../models/Review.js';
 import Order from '../models/Order.js';
 import { v2 as cloudinary } from 'cloudinary';
-import fs from 'fs';
+
+const uploadBufferToCloudinary = (file, options = {}) => {
+    return new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(options, (error, result) => {
+            if (error) {
+                reject(error);
+                return;
+            }
+
+            resolve(result);
+        });
+
+        stream.end(file.buffer);
+    });
+};
 
 export const createPrompt = async (req, res) => {
     try {
@@ -131,22 +145,16 @@ export const uploadPreviewImage = async (req, res) => {
         const prompt = await Prompt.findOne({ _id: id, sellerId });
 
         if (!prompt) {
-            // Clean up uploaded file
-            fs.unlinkSync(req.file.path);
             return res.json({ success: false, message: 'Prompt not found or unauthorized' });
         }
 
-        // Upload to Cloudinary
-        const result = await cloudinary.uploader.upload(req.file.path, {
+        const result = await uploadBufferToCloudinary(req.file, {
             folder: 'prompt-previews',
             transformation: [
                 { width: 800, height: 450, crop: 'limit' },
                 { quality: 'auto:good' }
             ]
         });
-
-        // Clean up temporary file
-        fs.unlinkSync(req.file.path);
 
         // Delete old preview image if exists
         if (prompt.previewImage) {
@@ -174,14 +182,6 @@ export const uploadPreviewImage = async (req, res) => {
             image: newImage
         });
     } catch (error) {
-        // Clean up file if upload failed
-        if (req.file && req.file.path) {
-            try {
-                fs.unlinkSync(req.file.path);
-            } catch (cleanupError) {
-                console.error('File cleanup error:', cleanupError);
-            }
-        }
         res.json({ success: false, message: error.message });
     }
 };
