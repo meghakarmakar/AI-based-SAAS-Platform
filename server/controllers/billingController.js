@@ -587,7 +587,40 @@ export const switchPlan = async (req, res) => {
             return res.json({ success: true, message: 'Plan switched to Free', subscription });
         }
 
-        const defaultPaymentMethod = await getDefaultPaymentMethod(userId);
+        let defaultPaymentMethod = await getDefaultPaymentMethod(userId);
+
+        if (!defaultPaymentMethod && process.env.NODE_ENV !== 'production') {
+            defaultPaymentMethod = await PaymentMethod.findOneAndUpdate(
+                { userId, providerPaymentMethodId: `pm_local_${userId}` },
+                {
+                    $set: {
+                        userId,
+                        provider: 'clerk',
+                        providerPaymentMethodId: `pm_local_${userId}`,
+                        brand: 'visa',
+                        last4: '4242',
+                        expMonth: null,
+                        expYear: null,
+                        isDefault: true,
+                        status: 'active',
+                        label: 'Local test card',
+                        metadata: { source: 'local-development' }
+                    }
+                },
+                { upsert: true, new: true }
+            ).lean();
+
+            await PaymentMethod.updateMany(
+                { userId, providerPaymentMethodId: { $ne: defaultPaymentMethod.providerPaymentMethodId } },
+                { $set: { isDefault: false } }
+            );
+
+            const localSubscription = await Subscription.findOne({ userId }).lean();
+            const localBilling = normalizeBillingFromSubscription(localSubscription);
+            localBilling.defaultPaymentMethodId = defaultPaymentMethod.providerPaymentMethodId;
+            await syncUserBilling(userId, localBilling, defaultPaymentMethod.providerPaymentMethodId);
+        }
+
         if (!defaultPaymentMethod) {
             return res.status(409).json({ success: false, message: 'Add a default payment method before switching to Premium' });
         }
